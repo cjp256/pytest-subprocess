@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
+import asyncio
 import getpass
 import os
 import platform
 import subprocess
 import sys
+from collections import deque
 
 import pytest
 
@@ -871,3 +873,24 @@ def test_call_count(fake_process):
     assert fake_process.call_count(["cp", "/source", fake_process.any()]) == 2
     assert fake_process.call_count(["cp", fake_process.any()]) == 3
     assert fake_process.call_count(["ls", "-lah"]) == 1
+
+
+def test_asynchronous():
+    data = deque()
+
+    async def run_sleep(time, queue: deque):
+        proc = await asyncio.create_subprocess_shell(
+            f"sleep {time}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await proc.communicate()
+        queue.append(time)
+
+    loop = asyncio.get_event_loop()
+    wait = asyncio.wait(
+        [run_sleep(0.3, data), run_sleep(0.2, data), run_sleep(0.1, data)]
+    )
+    loop.run_until_complete(wait)
+
+    assert tuple(data) == (0.1, 0.2, 0.3)
